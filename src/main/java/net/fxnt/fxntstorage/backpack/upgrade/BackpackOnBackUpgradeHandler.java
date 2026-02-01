@@ -66,7 +66,7 @@ public class BackpackOnBackUpgradeHandler {
     }
 
     public boolean hasUpgrade(String upgradeName) {
-        if (this.itemStack.isEmpty() || this.itemStack.getComponentsPatch().isEmpty()) return false;
+        if (this.itemStack.isEmpty()) return false;
         List<String> upgrades = Optional.ofNullable(this.itemStack.getComponents().get(ModDataComponents.BACKPACK_UPGRADES))
                 .orElse(List.of())
                 .stream().toList();
