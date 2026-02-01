@@ -201,7 +201,22 @@ public class BackpackContainer implements IBackpackContainer, IItemHandlerModifi
             }
 
             if (!newInventory.equals(oldInventory) || !newSort.equals(oldSort)) {
-                refreshUpgrades();
+                // Only refresh upgrades if upgrade slots actually changed.
+                // Rebuilding from itemHandler when upgrade slots weren't loaded
+                // (e.g. due to ItemContainerContents trimming) clears the
+                // BACKPACK_UPGRADES component and breaks all upgrades permanently.
+                boolean upgradesChanged = false;
+                int upgradeStart = BackpackBlock.ITEM_SLOT_COUNT + BackpackBlock.TOOL_SLOT_COUNT;
+                int upgradeEnd = upgradeStart + BackpackBlock.UPGRADE_SLOT_COUNT;
+                for (int k = upgradeStart; k < upgradeEnd; k++) {
+                    if (!ItemStack.matches(oldInventory.get(k), newInventory.get(k))) {
+                        upgradesChanged = true;
+                        break;
+                    }
+                }
+                if (upgradesChanged) {
+                    refreshUpgrades();
+                }
                 saveItemsToStack();
             }
         }
