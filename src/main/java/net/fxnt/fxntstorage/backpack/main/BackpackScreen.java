@@ -7,6 +7,7 @@ import net.fxnt.fxntstorage.FXNTStorage;
 import net.fxnt.fxntstorage.network.packet.KeyPressedPacket;
 import net.fxnt.fxntstorage.util.KeybindHandler;
 import net.fxnt.fxntstorage.util.SortOrder;
+import net.fxnt.fxntstorage.backpack.util.BackpackNetworkHelper;
 import net.fxnt.fxntstorage.util.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -183,6 +184,7 @@ public class BackpackScreen extends AbstractContainerScreen<BackpackMenu> {
                     button.setMessage(currentSortOrder.getDisplayName());
                     button.setTooltip(Tooltip.create(Component.literal("Sort by ").append(currentSortOrder.name().toUpperCase(Locale.ROOT))));
                     menu.setSortOrder(currentSortOrder);
+                    BackpackNetworkHelper.sortBackpack(Util.ITEM_SLOT_START_RANGE, currentSortOrder);
                 })
                 .tooltip(Tooltip.create(Component.literal("Sort by ").append(currentSortOrder.name().toUpperCase(Locale.ROOT))))
                 .size(16, 12)
