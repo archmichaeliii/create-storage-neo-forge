@@ -57,17 +57,20 @@ public class BackpackOnBackUpgradeHandler {
 
     private final Player player;
     private final BackpackHelper helper;
-    private final ItemStack itemStack;
 
     public BackpackOnBackUpgradeHandler(Player player) {
         this.player = player;
         this.helper = new BackpackHelper();
-        this.itemStack = BackpackHelper.getEquippedBackpackStack(player);
+    }
+
+    private ItemStack getBackpackStack() {
+        return BackpackHelper.getEquippedBackpackStack(player);
     }
 
     public boolean hasUpgrade(String upgradeName) {
-        if (this.itemStack.isEmpty()) return false;
-        List<String> upgrades = Optional.ofNullable(this.itemStack.getComponents().get(ModDataComponents.BACKPACK_UPGRADES))
+        ItemStack backpack = getBackpackStack();
+        if (backpack.isEmpty()) return false;
+        List<String> upgrades = Optional.ofNullable(backpack.getComponents().get(ModDataComponents.BACKPACK_UPGRADES))
                 .orElse(List.of())
                 .stream().toList();
 
@@ -78,13 +81,13 @@ public class BackpackOnBackUpgradeHandler {
         if (player.containerMenu instanceof BackpackMenu backPackMenu && backPackMenu.backpackType == Util.BACKPACK_ON_BACK) {
             return backPackMenu.container;
         } else {
-            return new BackpackContainer(this.itemStack, this.player);
+            return new BackpackContainer(getBackpackStack(), this.player);
         }
     }
 
     // SERVER SIDE
     public void applyMagnetUpgrade() {
-        if (this.itemStack.isEmpty() || this.player.level().isClientSide || !hasUpgrade(Util.MAGNET_UPGRADE)) return;
+        if (getBackpackStack().isEmpty() || this.player.level().isClientSide || !hasUpgrade(Util.MAGNET_UPGRADE)) return;
 
         // Define the bounding box around the center position
         AABB boundingBox = new AABB(this.player.blockPosition()).inflate(ConfigManager.CommonConfig.BACKPACK_MAGNET_RANGE.get());
@@ -116,7 +119,7 @@ public class BackpackOnBackUpgradeHandler {
 
     // SERVER SIDE
     public boolean applyItemPickupUpgrade(ItemEntity itemEntity, UUID target, int pickupDelay) {
-        if (this.itemStack.isEmpty() || this.player.level().isClientSide || !hasUpgrade(Util.ITEMPICKUP_UPGRADE) || hasUpgrade(Util.MAGNET_UPGRADE))
+        if (getBackpackStack().isEmpty() || this.player.level().isClientSide || !hasUpgrade(Util.ITEMPICKUP_UPGRADE) || hasUpgrade(Util.MAGNET_UPGRADE))
             return false;
         ItemStack itemStack = itemEntity.getItem();
         Item item = itemStack.getItem();
@@ -138,13 +141,13 @@ public class BackpackOnBackUpgradeHandler {
 
     // SERVER SIDE
     public void applyPickBlockUpgrade(ItemStack pickedStack) {
-        if (this.itemStack.isEmpty() || this.player.level().isClientSide || !hasUpgrade(Util.PICKBLOCK_UPGRADE)) return;
+        if (getBackpackStack().isEmpty() || this.player.level().isClientSide || !hasUpgrade(Util.PICKBLOCK_UPGRADE)) return;
         PickBlockHandler.pickBlockHandler(player, getContainer(), pickedStack);
     }
 
     // SERVER SIDE
     public void applyFeederUpgrade() {
-        if (this.itemStack.isEmpty() || this.player.level().isClientSide || !hasUpgrade(Util.FEEDER_UPGRADE)) return;
+        if (getBackpackStack().isEmpty() || this.player.level().isClientSide || !hasUpgrade(Util.FEEDER_UPGRADE)) return;
         boolean doFeed = shouldFeedPlayer();
 
         if (doFeed) {
@@ -266,7 +269,7 @@ public class BackpackOnBackUpgradeHandler {
 
     // SERVER SIDE
     public void applyRefillUpgrade() {
-        if (itemStack.isEmpty() || player.level().isClientSide || !hasUpgrade(Util.REFILL_UPGRADE)) return;
+        if (getBackpackStack().isEmpty() || player.level().isClientSide || !hasUpgrade(Util.REFILL_UPGRADE)) return;
 
         // Check for matching items in player inventory and backpack and fill hand stack
         refillHand(player.getMainHandItem(), false);
@@ -366,12 +369,12 @@ public class BackpackOnBackUpgradeHandler {
     }
 
     public boolean applyFallDamageUpgrade() {
-        return !this.itemStack.isEmpty() && !this.player.level().isClientSide && hasUpgrade(Util.FALLDAMAGE_UPGRADE);
+        return !getBackpackStack().isEmpty() && !this.player.level().isClientSide && hasUpgrade(Util.FALLDAMAGE_UPGRADE);
     }
 
     // SERVER SIDE
     public void fromAttackBlockEvent(Player player, Level level, InteractionHand hand, BlockPos pos) {
-        if (this.itemStack.isEmpty() || hand != InteractionHand.OFF_HAND && player.isSpectator() || level.isClientSide || !player.isAlive()
+        if (getBackpackStack().isEmpty() || hand != InteractionHand.OFF_HAND && player.isSpectator() || level.isClientSide || !player.isAlive()
                 || player.isSleeping() || player.isDeadOrDying() || !hasUpgrade(Util.TOOLSWAP_UPGRADE)
                 || player.getMainHandItem().is(AllItems.WRENCH)) return;
 
@@ -380,7 +383,7 @@ public class BackpackOnBackUpgradeHandler {
     }
 
     public void fromAttackEntityEvent(Player player, Level level, InteractionHand hand, LivingEntity entity) {
-        if (this.itemStack.isEmpty() || hand != InteractionHand.OFF_HAND && player.isSpectator() || level.isClientSide || !player.isAlive()
+        if (getBackpackStack().isEmpty() || hand != InteractionHand.OFF_HAND && player.isSpectator() || level.isClientSide || !player.isAlive()
                 || player.isSleeping() || player.isDeadOrDying() || !hasUpgrade(Util.TOOLSWAP_UPGRADE)
                 || player.getMainHandItem().is(AllItems.WRENCH)) return;
 
