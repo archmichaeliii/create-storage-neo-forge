@@ -161,7 +161,8 @@ public class BackpackOnBackUpgradeHandler {
 
     // SERVER SIDE
     public boolean applyItemPickupUpgrade(ItemEntity itemEntity, UUID target, int pickupDelay) {
-        if (this.itemStack.isEmpty() || this.player.level().isClientSide || !hasUpgrade(Util.ITEMPICKUP_UPGRADE) || hasUpgrade(Util.MAGNET_UPGRADE))
+        if (this.itemStack.isEmpty() || this.player.level().isClientSide
+                || (!hasUpgrade(Util.ITEMPICKUP_UPGRADE) && !hasUpgrade(Util.MAGNET_UPGRADE)))
             return false;
         ItemStack itemStack = itemEntity.getItem();
         Item item = itemStack.getItem();
