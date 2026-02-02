@@ -82,7 +82,20 @@ public class BackpackContainer implements IBackpackContainer, IItemHandlerModifi
 
     public void saveItemsToStack() {
         this.stack.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(getItems()));
-        this.stack.set(ModDataComponents.BACKPACK_UPGRADES, upgrades);
+
+        // Safety: never overwrite existing upgrade data with an empty list.
+        // If our upgrades list is empty but the stack already has upgrades,
+        // preserve the existing data to prevent permanent upgrade loss.
+        if (!upgrades.isEmpty()) {
+            this.stack.set(ModDataComponents.BACKPACK_UPGRADES, upgrades);
+        } else {
+            List<String> existing = this.stack.get(ModDataComponents.BACKPACK_UPGRADES);
+            if (existing == null || existing.isEmpty()) {
+                this.stack.set(ModDataComponents.BACKPACK_UPGRADES, upgrades);
+            }
+            // else: keep existing non-empty upgrades rather than overwriting with empty
+        }
+
         this.stack.set(ModDataComponents.BACKPACK_STACK_MULTIPLIER, stackMultiplier);
         this.stack.set(ModDataComponents.INVENTORY_SORT_ORDER, sortOrder);
     }
