@@ -62,11 +62,9 @@ public class BackpackContainer implements IBackpackContainer, IItemHandlerModifi
         }
 
         if (itemStack.getComponents().has(ModDataComponents.BACKPACK_UPGRADES)) {
-            upgrades.clear();
             List<String> upgradeList = itemStack.getComponents().get(ModDataComponents.BACKPACK_UPGRADES);
-
+            upgrades.clear();
             if (upgradeList != null) {
-                upgrades.clear();
                 upgrades.addAll(upgradeList);
             }
         }
