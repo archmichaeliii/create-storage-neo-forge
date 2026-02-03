@@ -167,7 +167,7 @@ public class BackpackEntity extends BlockEntity implements IBackpackContainer, M
     }
 
     public List<ItemStack> getStacks() {
-        List<ItemStack> stacks = new ArrayList<>(List.of());
+        List<ItemStack> stacks = new ArrayList<>();
         for (int i = 0; i < itemHandler.getSlots(); ++i) {
             stacks.add(itemHandler.getStackInSlot(i));
         }
@@ -250,7 +250,6 @@ public class BackpackEntity extends BlockEntity implements IBackpackContainer, M
         for (int i = UPGRADE_SLOT_START_INDEX; i < UPGRADE_SLOT_END_INDEX; i++) {
             ItemStack itemStack = this.itemHandler.getStackInSlot(i);
             if (itemStack.getItem() instanceof UpgradeItem upgradeItem) {
-                // ADD TO UPGRADE CACHE
                 String upgradeName = upgradeItem.getUpgradeName();
                 if (!this.upgrades.contains(upgradeName)) {
                     this.upgrades.add(upgradeName);

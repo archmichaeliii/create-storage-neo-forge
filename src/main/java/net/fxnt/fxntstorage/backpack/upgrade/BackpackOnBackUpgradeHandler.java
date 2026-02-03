@@ -54,7 +54,15 @@ import net.neoforged.neoforge.event.EventHooks;
 import net.neoforged.neoforge.items.IItemHandlerModifiable;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Queue;
+import java.util.Set;
+import java.util.UUID;
 
 public class BackpackOnBackUpgradeHandler {
 
@@ -71,8 +79,7 @@ public class BackpackOnBackUpgradeHandler {
     public boolean hasUpgrade(String upgradeName) {
         if (this.itemStack.isEmpty()) return false;
         List<String> upgrades = Optional.ofNullable(this.itemStack.getComponents().get(ModDataComponents.BACKPACK_UPGRADES))
-                .orElse(List.of())
-                .stream().toList();
+                .orElse(List.of());
 
         if (upgrades.contains(upgradeName)) return true;
 
@@ -96,7 +103,7 @@ public class BackpackOnBackUpgradeHandler {
     }
 
     private void repairUpgradeComponent(List<ItemStack> items, int upgradeStart, int upgradeEnd) {
-        List<String> repairedUpgrades = new java.util.ArrayList<>();
+        List<String> repairedUpgrades = new ArrayList<>();
         for (int i = upgradeStart; i < upgradeEnd; i++) {
             if (items.get(i).getItem() instanceof UpgradeItem upgradeItem) {
                 String name = upgradeItem.getUpgradeName();
