@@ -2,7 +2,6 @@ package net.fxnt.fxntstorage.backpack.upgrade;
 
 import com.simibubi.create.AllItems;
 import net.fxnt.fxntstorage.backpack.BackpackBlock;
-import net.fxnt.fxntstorage.backpack.BackpackItem;
 import net.fxnt.fxntstorage.backpack.main.BackpackContainer;
 import net.fxnt.fxntstorage.backpack.main.BackpackMenu;
 import net.fxnt.fxntstorage.backpack.main.IBackpackContainer;
@@ -21,7 +20,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.stats.Stats;
 import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -29,7 +27,6 @@ import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.food.FoodData;
 import net.minecraft.world.food.FoodProperties;
@@ -47,7 +44,6 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.event.EventHooks;
@@ -62,17 +58,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
-import java.util.UUID;
 
 public class BackpackOnBackUpgradeHandler {
 
     private final Player player;
-    private final BackpackHelper helper;
     private final ItemStack itemStack;
 
     public BackpackOnBackUpgradeHandler(Player player) {
         this.player = player;
-        this.helper = new BackpackHelper();
         this.itemStack = BackpackHelper.getEquippedBackpackStack(player);
     }
 
@@ -123,71 +116,7 @@ public class BackpackOnBackUpgradeHandler {
         }
     }
 
-    // SERVER SIDE
-    public void applyMagnetUpgrade() {
-        if (this.itemStack.isEmpty() || this.player.level().isClientSide || !hasUpgrade(Util.MAGNET_UPGRADE)) return;
-
-        // Define the bounding box around the center position
-        AABB boundingBox = new AABB(this.player.blockPosition()).inflate(ConfigManager.CommonConfig.BACKPACK_MAGNET_RANGE.get());
-
-        // Retrieve all item entities within the range
-        List<ItemEntity> nearbyItems = this.player.level().getEntitiesOfClass(ItemEntity.class, boundingBox);
-
-        if (!nearbyItems.isEmpty()) {
-            // Reuse a single container for the entire magnet tick to avoid
-            // repeated load/save cycles that can corrupt component data
-            IBackpackContainer container = getContainer();
-
-            for (ItemEntity itemEntity : nearbyItems) {
-                if (itemEntity.isRemoved() || itemEntity.getItem().isEmpty()) continue;
-                if (itemEntity.getItem().getItem() instanceof BackpackItem) continue;
-
-                CompoundTag pd = player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG);
-                if (pd.contains("IgnoreFanProcessing") && pd.getBoolean("IgnoreFanProcessing")) {
-                    CompoundTag nbt = itemEntity.getPersistentData();
-                    if (nbt.contains("CreateData")) {
-                        CompoundTag createData = nbt.getCompound("CreateData");
-                        if (createData.contains("Processing")) {
-                            CompoundTag processing = createData.getCompound("Processing");
-                            if (processing.contains("Time") && processing.getInt("Time") > 0) continue;
-                        }
-                    }
-                }
-
-                int countBefore = itemEntity.getItem().getCount();
-                this.helper.itemEntityToBackpack(container, itemEntity, Util.ITEM_SLOT_START_RANGE, Util.ITEM_SLOT_END_RANGE);
-                if (itemEntity.getItem().isEmpty()) {
-                    player.take(itemEntity, countBefore);
-                    itemEntity.discard();
-                } else if (itemEntity.getItem().getCount() < countBefore) {
-                    player.take(itemEntity, countBefore - itemEntity.getItem().getCount());
-                }
-            }
-        }
-    }
-
-    // SERVER SIDE
-    public boolean applyItemPickupUpgrade(ItemEntity itemEntity, UUID target, int pickupDelay) {
-        if (this.itemStack.isEmpty() || this.player.level().isClientSide
-                || (!hasUpgrade(Util.ITEMPICKUP_UPGRADE) && !hasUpgrade(Util.MAGNET_UPGRADE)))
-            return false;
-        ItemStack itemStack = itemEntity.getItem();
-        Item item = itemStack.getItem();
-        int i = itemStack.getCount();
-        if (pickupDelay == 0 && (target == null || target.equals(player.getUUID())) &&
-                this.helper.itemEntityToBackpack(getContainer(), itemEntity, Util.ITEM_SLOT_START_RANGE, Util.ITEM_SLOT_END_RANGE)) {
-
-            player.take(itemEntity, i);
-            if (itemStack.isEmpty()) {
-                itemEntity.discard();
-                itemStack.setCount(i);
-            }
-            player.awardStat(Stats.ITEM_PICKED_UP.get(item), i);
-            player.onItemPickup(itemEntity);
-            return true;
-        }
-        return false;
-    }
+    // Magnet and item pickup logic delegated to MagnetUpgradeHandler
 
     // SERVER SIDE
     public void applyPickBlockUpgrade(ItemStack pickedStack) {

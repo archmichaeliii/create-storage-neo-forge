@@ -6,6 +6,7 @@ import net.fxnt.fxntstorage.backpack.main.BackpackContainer;
 import net.fxnt.fxntstorage.backpack.main.IBackpackContainer;
 import net.fxnt.fxntstorage.backpack.upgrade.BackpackOnBackUpgradeHandler;
 import net.fxnt.fxntstorage.backpack.upgrade.JetpackHandler;
+import net.fxnt.fxntstorage.backpack.upgrade.MagnetUpgradeHandler;
 import net.fxnt.fxntstorage.backpack.upgrade.JetpackManager;
 import net.fxnt.fxntstorage.backpack.upgrade.TorchDeployerManager;
 import net.fxnt.fxntstorage.backpack.util.BackpackHelper;
@@ -139,6 +140,9 @@ public class EventHandler {
         /* Torch Deployer Upgrade */
         if (handler.hasUpgrade(Util.TORCHDEPLOYER_UPGRADE)) handler.applyTorchDeployerUpgrade(player);
 
+        /* Magnet Upgrade - manages its own per-player tick interval */
+        MagnetUpgradeHandler.tick(player, handler);
+
         mediumTick++;
         slowTick++;
         if (mediumTick >= mediumTicks) {
@@ -147,7 +151,6 @@ public class EventHandler {
             mediumTick = 0;
         }
         if (slowTick >= slowTicks) {
-            handler.applyMagnetUpgrade();
             slowTick = 0;
         }
     }
@@ -195,6 +198,7 @@ public class EventHandler {
         if (event.getEntity() instanceof ServerPlayer player) {
             JetpackManager.removePlayer(player);
             TorchDeployerManager.removePlayer(player);
+            MagnetUpgradeHandler.removePlayer(player);
         }
     }
 
