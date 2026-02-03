@@ -1,6 +1,7 @@
 package net.fxnt.fxntstorage.backpack.upgrade;
 
 import com.simibubi.create.AllItems;
+import net.fxnt.fxntstorage.backpack.BackpackBlock;
 import net.fxnt.fxntstorage.backpack.BackpackItem;
 import net.fxnt.fxntstorage.backpack.main.BackpackContainer;
 import net.fxnt.fxntstorage.backpack.main.BackpackMenu;
@@ -9,6 +10,7 @@ import net.fxnt.fxntstorage.backpack.util.BackpackHelper;
 import net.fxnt.fxntstorage.config.ConfigManager;
 import net.fxnt.fxntstorage.init.ModDataComponents;
 import net.fxnt.fxntstorage.init.ModTags;
+import net.fxnt.fxntstorage.item.upgrades.UpgradeItem;
 import net.fxnt.fxntstorage.util.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
@@ -35,6 +37,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.component.SuspiciousStewEffects;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
@@ -71,7 +74,38 @@ public class BackpackOnBackUpgradeHandler {
                 .orElse(List.of())
                 .stream().toList();
 
-        return upgrades.contains(upgradeName);
+        if (upgrades.contains(upgradeName)) return true;
+
+        // Fallback: check actual upgrade items in CONTAINER component.
+        // The BACKPACK_UPGRADES string list can become empty/corrupt under
+        // certain sync conditions. The actual items are the source of truth.
+        ItemContainerContents contents = this.itemStack.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY);
+        List<ItemStack> items = contents.stream().toList();
+        int upgradeStart = BackpackBlock.ITEM_SLOT_COUNT + BackpackBlock.TOOL_SLOT_COUNT;
+        int upgradeEnd = Math.min(upgradeStart + BackpackBlock.UPGRADE_SLOT_COUNT, items.size());
+        for (int i = upgradeStart; i < upgradeEnd; i++) {
+            if (items.get(i).getItem() instanceof UpgradeItem upgradeItem) {
+                if (upgradeItem.getUpgradeName().equals(upgradeName)) {
+                    // Repair the corrupt BACKPACK_UPGRADES component
+                    repairUpgradeComponent(items, upgradeStart, upgradeEnd);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void repairUpgradeComponent(List<ItemStack> items, int upgradeStart, int upgradeEnd) {
+        List<String> repairedUpgrades = new java.util.ArrayList<>();
+        for (int i = upgradeStart; i < upgradeEnd; i++) {
+            if (items.get(i).getItem() instanceof UpgradeItem upgradeItem) {
+                String name = upgradeItem.getUpgradeName();
+                if (!repairedUpgrades.contains(name)) {
+                    repairedUpgrades.add(name);
+                }
+            }
+        }
+        this.itemStack.set(ModDataComponents.BACKPACK_UPGRADES, repairedUpgrades);
     }
 
     private IBackpackContainer getContainer() {
@@ -93,7 +127,12 @@ public class BackpackOnBackUpgradeHandler {
         List<ItemEntity> nearbyItems = this.player.level().getEntitiesOfClass(ItemEntity.class, boundingBox);
 
         if (!nearbyItems.isEmpty()) {
+            // Reuse a single container for the entire magnet tick to avoid
+            // repeated load/save cycles that can corrupt component data
+            IBackpackContainer container = getContainer();
+
             for (ItemEntity itemEntity : nearbyItems) {
+                if (itemEntity.isRemoved() || itemEntity.getItem().isEmpty()) continue;
                 if (itemEntity.getItem().getItem() instanceof BackpackItem) continue;
 
                 CompoundTag pd = player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG);
@@ -108,15 +147,22 @@ public class BackpackOnBackUpgradeHandler {
                     }
                 }
 
-                this.helper.itemEntityToBackpack(getContainer(), itemEntity, Util.ITEM_SLOT_START_RANGE, Util.ITEM_SLOT_END_RANGE);
-                player.take(itemEntity, itemEntity.getItem().getCount());
+                int countBefore = itemEntity.getItem().getCount();
+                this.helper.itemEntityToBackpack(container, itemEntity, Util.ITEM_SLOT_START_RANGE, Util.ITEM_SLOT_END_RANGE);
+                if (itemEntity.getItem().isEmpty()) {
+                    player.take(itemEntity, countBefore);
+                    itemEntity.discard();
+                } else if (itemEntity.getItem().getCount() < countBefore) {
+                    player.take(itemEntity, countBefore - itemEntity.getItem().getCount());
+                }
             }
         }
     }
 
     // SERVER SIDE
     public boolean applyItemPickupUpgrade(ItemEntity itemEntity, UUID target, int pickupDelay) {
-        if (this.itemStack.isEmpty() || this.player.level().isClientSide || !hasUpgrade(Util.ITEMPICKUP_UPGRADE) || hasUpgrade(Util.MAGNET_UPGRADE))
+        if (this.itemStack.isEmpty() || this.player.level().isClientSide
+                || (!hasUpgrade(Util.ITEMPICKUP_UPGRADE) && !hasUpgrade(Util.MAGNET_UPGRADE)))
             return false;
         ItemStack itemStack = itemEntity.getItem();
         Item item = itemStack.getItem();

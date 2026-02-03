@@ -82,7 +82,20 @@ public class BackpackContainer implements IBackpackContainer, IItemHandlerModifi
 
     public void saveItemsToStack() {
         this.stack.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(getItems()));
-        this.stack.set(ModDataComponents.BACKPACK_UPGRADES, upgrades);
+
+        // Safety: never overwrite existing upgrade data with an empty list.
+        // If our upgrades list is empty but the stack already has upgrades,
+        // preserve the existing data to prevent permanent upgrade loss.
+        if (!upgrades.isEmpty()) {
+            this.stack.set(ModDataComponents.BACKPACK_UPGRADES, upgrades);
+        } else {
+            List<String> existing = this.stack.get(ModDataComponents.BACKPACK_UPGRADES);
+            if (existing == null || existing.isEmpty()) {
+                this.stack.set(ModDataComponents.BACKPACK_UPGRADES, upgrades);
+            }
+            // else: keep existing non-empty upgrades rather than overwriting with empty
+        }
+
         this.stack.set(ModDataComponents.BACKPACK_STACK_MULTIPLIER, stackMultiplier);
         this.stack.set(ModDataComponents.INVENTORY_SORT_ORDER, sortOrder);
     }
@@ -201,7 +214,22 @@ public class BackpackContainer implements IBackpackContainer, IItemHandlerModifi
             }
 
             if (!newInventory.equals(oldInventory) || !newSort.equals(oldSort)) {
-                refreshUpgrades();
+                // Only refresh upgrades if upgrade slots actually changed.
+                // Rebuilding from itemHandler when upgrade slots weren't loaded
+                // (e.g. due to ItemContainerContents trimming) clears the
+                // BACKPACK_UPGRADES component and breaks all upgrades permanently.
+                boolean upgradesChanged = false;
+                int upgradeStart = BackpackBlock.ITEM_SLOT_COUNT + BackpackBlock.TOOL_SLOT_COUNT;
+                int upgradeEnd = upgradeStart + BackpackBlock.UPGRADE_SLOT_COUNT;
+                for (int k = upgradeStart; k < upgradeEnd; k++) {
+                    if (!ItemStack.matches(oldInventory.get(k), newInventory.get(k))) {
+                        upgradesChanged = true;
+                        break;
+                    }
+                }
+                if (upgradesChanged) {
+                    refreshUpgrades();
+                }
                 saveItemsToStack();
             }
         }

@@ -198,12 +198,14 @@ public class EventHandler {
         }
     }
 
+    private static final Set<UUID> playersVeinMining = new HashSet<>();
+
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
         Player player = event.getPlayer();
         Level level = player.level();
 
-        if (level.isClientSide && player.isCreative()) return;
+        if (level.isClientSide || player.isCreative()) return;
 
         BackpackOnBackUpgradeHandler handler = new BackpackOnBackUpgradeHandler(player);
 
@@ -215,6 +217,9 @@ public class EventHandler {
         // Ore Mining
         if (!handler.hasUpgrade(Util.OREMINING_UPGRADE)) return;
 
+        // Re-entrancy guard: prevent recursive vein mining
+        if (playersVeinMining.contains(player.getUUID())) return;
+
         ItemStack tool = player.getMainHandItem();
         if (tool.isCorrectToolForDrops(event.getState()) || event.getState().is(ModTags.Blocks.BREAKABLE_WITH_ANY_TOOL)) {
             if (ConfigManager.CommonConfig.OREMINE_ORES_ONLY.get() && !event.getState().is(ModTags.Blocks.ORE_MINING_BLOCK)) {
@@ -223,7 +228,12 @@ public class EventHandler {
 
             boolean mineAllBlocks = player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG).getBoolean("MineAllBlocks");
 
-            handler.applyOreMiningUpgrade(level, event.getPos(), player, mineAllBlocks, 64);
+            playersVeinMining.add(player.getUUID());
+            try {
+                handler.applyOreMiningUpgrade(level, event.getPos(), player, mineAllBlocks, 64);
+            } finally {
+                playersVeinMining.remove(player.getUUID());
+            }
             event.setCanceled(true);
         }
     }
