@@ -11,6 +11,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.stats.Stats;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -73,10 +74,14 @@ public final class MagnetUpgradeHandler {
         if (backpackStack.isEmpty()) return;
 
         IBackpackContainer container = getContainer(player, backpackStack);
+        boolean filterMode = isFilterModeEnabled(player);
         boolean changed = false;
 
         for (ItemEntity itemEntity : nearbyItems) {
             if (!isEligible(itemEntity, player)) continue;
+
+            // When filter mode is on, only attract/collect items that match existing backpack contents
+            if (filterMode && !backpackContainsItem(container, itemEntity.getItem())) continue;
 
             double distSq = itemEntity.distanceToSqr(player);
 
@@ -118,6 +123,12 @@ public final class MagnetUpgradeHandler {
         int originalCount = stack.getCount();
 
         IBackpackContainer container = getContainer(player, backpackStack);
+
+        // When filter mode is on, only redirect to backpack if the item matches existing contents
+        if (isFilterModeEnabled(player) && !backpackContainsItem(container, stack)) {
+            return false; // Let vanilla pickup handle it → goes to player inventory
+        }
+
         boolean inserted = insertIntoBackpack(container, itemEntity);
 
         if (inserted) {
@@ -135,6 +146,30 @@ public final class MagnetUpgradeHandler {
     }
 
     // ── Filtering ───────────────────────────────────────────────────────────
+
+    /**
+     * Checks whether the magnet filter mode is enabled for this player.
+     * When enabled, the magnet only picks up items matching existing backpack contents.
+     */
+    private static boolean isFilterModeEnabled(Player player) {
+        CompoundTag settings = player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG);
+        return settings.contains("MagnetFilterToBackpackContents") && settings.getBoolean("MagnetFilterToBackpackContents");
+    }
+
+    /**
+     * Checks whether the backpack already contains an item of the same type.
+     */
+    private static boolean backpackContainsItem(IBackpackContainer container, ItemStack itemStack) {
+        IItemHandlerModifiable itemHandler = container.getItemHandler();
+        Item targetItem = itemStack.getItem();
+        for (int i = Util.ITEM_SLOT_START_RANGE; i < Util.ITEM_SLOT_END_RANGE; i++) {
+            ItemStack slotStack = itemHandler.getStackInSlot(i);
+            if (!slotStack.isEmpty() && slotStack.getItem() == targetItem) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     /**
      * Determines whether an item entity is eligible for magnet collection.

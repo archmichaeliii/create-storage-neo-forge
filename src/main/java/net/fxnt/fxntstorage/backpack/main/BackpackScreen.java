@@ -4,11 +4,13 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.fxnt.fxntstorage.FXNTStorage;
+import net.fxnt.fxntstorage.config.ConfigManager;
 import net.fxnt.fxntstorage.network.packet.KeyPressedPacket;
 import net.fxnt.fxntstorage.util.KeybindHandler;
 import net.fxnt.fxntstorage.util.SortOrder;
 import net.fxnt.fxntstorage.backpack.util.BackpackNetworkHelper;
 import net.fxnt.fxntstorage.util.Util;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -103,6 +105,7 @@ public class BackpackScreen extends AbstractContainerScreen<BackpackMenu> {
     private int textureHeight = GUI_TEXTURE_4_HEIGHT;
 
     private SortOrder currentSortOrder;
+    private boolean magnetFilterEnabled;
 
     public BackpackScreen(BackpackMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -191,6 +194,32 @@ public class BackpackScreen extends AbstractContainerScreen<BackpackMenu> {
                 .pos(leftPos + imageWidth - 42, topPos + 4)
                 .build();
         addRenderableWidget(sortOrder);
+
+        magnetFilterEnabled = ConfigManager.ClientConfig.MAGNET_FILTER_TO_BACKPACK_CONTENTS.get();
+        Button magnetFilter = Button.builder(getMagnetFilterLabel(magnetFilterEnabled), button -> {
+                    magnetFilterEnabled = !magnetFilterEnabled;
+                    ConfigManager.ClientConfig.MAGNET_FILTER_TO_BACKPACK_CONTENTS.set(magnetFilterEnabled);
+                    button.setMessage(getMagnetFilterLabel(magnetFilterEnabled));
+                    button.setTooltip(Tooltip.create(getMagnetFilterTooltip(magnetFilterEnabled)));
+                    ConfigManager.ClientConfig.sendSettings(menu.player);
+                })
+                .tooltip(Tooltip.create(getMagnetFilterTooltip(magnetFilterEnabled)))
+                .size(16, 12)
+                .pos(leftPos + imageWidth - 60, topPos + 4)
+                .build();
+        addRenderableWidget(magnetFilter);
+    }
+
+    private Component getMagnetFilterLabel(boolean enabled) {
+        return Component.literal("F").withStyle(enabled ? ChatFormatting.GREEN : ChatFormatting.GRAY);
+    }
+
+    private Component getMagnetFilterTooltip(boolean enabled) {
+        String state = enabled ? "ON" : "OFF";
+        String description = enabled
+                ? "Magnet only picks up items matching backpack contents"
+                : "Magnet picks up all items into backpack";
+        return Component.literal("Magnet Filter: " + state + "\n" + description);
     }
 
     private void initializeSlots() {
