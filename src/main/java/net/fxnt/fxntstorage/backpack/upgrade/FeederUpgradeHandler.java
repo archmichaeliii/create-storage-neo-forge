@@ -60,10 +60,28 @@ public final class FeederUpgradeHandler {
     // ── Feeding ─────────────────────────────────────────────────────────────
 
     /**
-     * Searches the backpack for valid food and feeds the player if needed.
+     * Searches the backpack for valid food and feeds the player with the best match.
+     * In emergency mode (low health), picks the most nutritious food.
+     * In normal mode, picks the food that best fits the hunger deficit to minimize waste.
      */
     private static void tryFeedPlayer(Player player) {
-        if (!shouldFeedPlayer(player)) return;
+        if (player.isCreative() || player.isSpectator()) return;
+
+        FoodData foodData = player.getFoodData();
+        int hunger = foodData.getFoodLevel();
+        float health = player.getHealth();
+        float maxHealth = player.getMaxHealth();
+
+        CompoundTag fxntSettings = player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG);
+
+        // Emergency: health is critically low
+        double healthThreshold = (double) fxntSettings.getInt("FeederHealthThreshold") / 100;
+        boolean emergency = health < maxHealth * healthThreshold && hunger < 20;
+
+        // Normal: hunger below configured threshold
+        boolean normalFeed = hunger < fxntSettings.getDouble("FeederHungerLevel");
+
+        if (!emergency && !normalFeed) return;
 
         ItemStack backpackStack = BackpackHelper.getEquippedBackpackStack(player);
         if (backpackStack.isEmpty()) return;
@@ -71,12 +89,60 @@ public final class FeederUpgradeHandler {
         IBackpackContainer container = getContainer(player, backpackStack);
         IItemHandlerModifiable itemHandler = container.getItemHandler();
 
+        int hungerDeficit = 20 - hunger;
+        int bestSlot = -1;
+        int bestNutrition = -1;
+        boolean bestFitsDeficit = false;
+
         for (int i = Util.ITEM_SLOT_START_RANGE; i < Util.ITEM_SLOT_END_RANGE; i++) {
             ItemStack food = itemHandler.getStackInSlot(i);
             if (!isEdible(food, player) || hasNegativeEffects(food, player)) continue;
 
-            feedPlayer(player, container, itemHandler, i, food);
-            return;
+            FoodProperties props = food.getFoodProperties(player);
+            if (props == null) continue;
+            int nutrition = props.nutrition();
+
+            if (bestSlot == -1) {
+                bestSlot = i;
+                bestNutrition = nutrition;
+                bestFitsDeficit = nutrition <= hungerDeficit;
+                continue;
+            }
+
+            if (emergency) {
+                // Emergency: pick the most nutritious food for maximum recovery
+                if (nutrition > bestNutrition) {
+                    bestSlot = i;
+                    bestNutrition = nutrition;
+                }
+            } else {
+                // Normal: pick the food that best matches the hunger deficit
+                boolean fits = nutrition <= hungerDeficit;
+
+                if (fits && !bestFitsDeficit) {
+                    // This food fits within deficit, current best doesn't — switch
+                    bestSlot = i;
+                    bestNutrition = nutrition;
+                    bestFitsDeficit = true;
+                } else if (fits && bestFitsDeficit) {
+                    // Both fit within deficit — prefer higher nutrition (fills more, no waste)
+                    if (nutrition > bestNutrition) {
+                        bestSlot = i;
+                        bestNutrition = nutrition;
+                    }
+                } else if (!fits && !bestFitsDeficit) {
+                    // Neither fits — prefer lower nutrition (less waste)
+                    if (nutrition < bestNutrition) {
+                        bestSlot = i;
+                        bestNutrition = nutrition;
+                    }
+                }
+                // fits=false, bestFitsDeficit=true → keep current best
+            }
+        }
+
+        if (bestSlot >= 0) {
+            feedPlayer(player, container, itemHandler, bestSlot, itemHandler.getStackInSlot(bestSlot));
         }
     }
 
@@ -119,27 +185,6 @@ public final class FeederUpgradeHandler {
     }
 
     // ── Filtering ───────────────────────────────────────────────────────────
-
-    /**
-     * Determines whether the player should be fed based on hunger and health thresholds.
-     */
-    private static boolean shouldFeedPlayer(Player player) {
-        if (player.isCreative() || player.isSpectator()) return false;
-
-        FoodData foodData = player.getFoodData();
-        int hunger = foodData.getFoodLevel();
-        float health = player.getHealth();
-        float maxHealth = player.getMaxHealth();
-
-        CompoundTag fxntSettings = player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG);
-
-        // Feed immediately if health is low
-        double healthThreshold = (double) fxntSettings.getInt("FeederHealthThreshold") / 100;
-        if (health < maxHealth * healthThreshold && hunger < 20)
-            return true;
-
-        return hunger < fxntSettings.getDouble("FeederHungerLevel");
-    }
 
     /**
      * Checks whether an item stack is valid edible food with nutrition.
