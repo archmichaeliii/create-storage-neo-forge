@@ -104,6 +104,11 @@ public class BackpackEntity extends BlockEntity implements IBackpackContainer, M
             @Override
             protected void onContentsChanged(int slot) {
                 super.onContentsChanged(slot);
+                int upgradeStart = BackpackBlock.ITEM_SLOT_COUNT + BackpackBlock.TOOL_SLOT_COUNT;
+                int upgradeEnd = upgradeStart + BackpackBlock.UPGRADE_SLOT_COUNT;
+                if (slot >= upgradeStart && slot < upgradeEnd) {
+                    refreshUpgrades();
+                }
                 setChanged();
             }
         };
@@ -377,7 +382,6 @@ public class BackpackEntity extends BlockEntity implements IBackpackContainer, M
 
     @Override
     public void setChanged() {
-        refreshUpgrades();
         super.setChanged();
     }
 

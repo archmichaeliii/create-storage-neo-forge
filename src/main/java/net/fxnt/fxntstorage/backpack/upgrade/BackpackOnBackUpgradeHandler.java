@@ -13,6 +13,7 @@ import net.fxnt.fxntstorage.item.upgrades.UpgradeItem;
 import net.fxnt.fxntstorage.util.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -46,7 +47,6 @@ import java.util.ArrayDeque;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 
@@ -54,18 +54,27 @@ public class BackpackOnBackUpgradeHandler {
 
     private final Player player;
     private final ItemStack itemStack;
+    private final Set<String> cachedUpgrades;
+    private IBackpackContainer cachedContainer;
 
     public BackpackOnBackUpgradeHandler(Player player) {
         this.player = player;
         this.itemStack = BackpackHelper.getEquippedBackpackStack(player);
+        this.cachedUpgrades = loadUpgrades();
     }
 
-    public boolean hasUpgrade(String upgradeName) {
-        if (this.itemStack.isEmpty()) return false;
-        List<String> upgrades = Optional.ofNullable(this.itemStack.getComponents().get(ModDataComponents.BACKPACK_UPGRADES))
-                .orElse(List.of());
+    /**
+     * Loads all upgrade names once during construction. If the BACKPACK_UPGRADES
+     * component is corrupt/empty, falls back to scanning the container items
+     * (expensive) but only does so once per handler instance instead of per-call.
+     */
+    private Set<String> loadUpgrades() {
+        if (this.itemStack.isEmpty()) return Set.of();
 
-        if (upgrades.contains(upgradeName)) return true;
+        List<String> upgrades = this.itemStack.getComponents().get(ModDataComponents.BACKPACK_UPGRADES);
+        if (upgrades != null && !upgrades.isEmpty()) {
+            return new HashSet<>(upgrades);
+        }
 
         // Fallback: check actual upgrade items in CONTAINER component.
         // The BACKPACK_UPGRADES string list can become empty/corrupt under
@@ -74,37 +83,34 @@ public class BackpackOnBackUpgradeHandler {
         List<ItemStack> items = contents.stream().toList();
         int upgradeStart = BackpackBlock.ITEM_SLOT_COUNT + BackpackBlock.TOOL_SLOT_COUNT;
         int upgradeEnd = Math.min(upgradeStart + BackpackBlock.UPGRADE_SLOT_COUNT, items.size());
+
+        Set<String> result = new HashSet<>();
         for (int i = upgradeStart; i < upgradeEnd; i++) {
             if (items.get(i).getItem() instanceof UpgradeItem upgradeItem) {
-                if (upgradeItem.getUpgradeName().equals(upgradeName)) {
-                    // Repair the corrupt BACKPACK_UPGRADES component
-                    repairUpgradeComponent(items, upgradeStart, upgradeEnd);
-                    return true;
-                }
+                result.add(upgradeItem.getUpgradeName());
             }
         }
-        return false;
+
+        // Repair the corrupt BACKPACK_UPGRADES component so future ticks skip the fallback
+        if (!result.isEmpty()) {
+            this.itemStack.set(ModDataComponents.BACKPACK_UPGRADES, new ArrayList<>(result));
+        }
+
+        return result;
     }
 
-    private void repairUpgradeComponent(List<ItemStack> items, int upgradeStart, int upgradeEnd) {
-        List<String> repairedUpgrades = new ArrayList<>();
-        for (int i = upgradeStart; i < upgradeEnd; i++) {
-            if (items.get(i).getItem() instanceof UpgradeItem upgradeItem) {
-                String name = upgradeItem.getUpgradeName();
-                if (!repairedUpgrades.contains(name)) {
-                    repairedUpgrades.add(name);
-                }
-            }
-        }
-        this.itemStack.set(ModDataComponents.BACKPACK_UPGRADES, repairedUpgrades);
+    public boolean hasUpgrade(String upgradeName) {
+        return cachedUpgrades.contains(upgradeName);
     }
 
     private IBackpackContainer getContainer() {
+        if (cachedContainer != null) return cachedContainer;
         if (player.containerMenu instanceof BackpackMenu backPackMenu && backPackMenu.backpackType == Util.BACKPACK_ON_BACK) {
-            return backPackMenu.container;
+            cachedContainer = backPackMenu.container;
         } else {
-            return new BackpackContainer(this.itemStack, this.player);
+            cachedContainer = new BackpackContainer(this.itemStack, this.player);
         }
+        return cachedContainer;
     }
 
     // Magnet and item pickup logic delegated to MagnetUpgradeHandler
@@ -357,9 +363,10 @@ public class BackpackOnBackUpgradeHandler {
         BlockPos belowPos = playerPos.below();
         Level level = player.level();
 
-        int lightLevel = player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG).getInt("TorchDeployerLightLevel");
-        int cooldown = player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG).getInt("TorchDeployerCooldown");
-        String sourceValue = player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG).getString("TorchDeployerLightSource");
+        CompoundTag settings = player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG);
+        int lightLevel = settings.getInt("TorchDeployerLightLevel");
+        int cooldown = settings.getInt("TorchDeployerCooldown");
+        String sourceValue = settings.getString("TorchDeployerLightSource");
 
         ConfigManager.ClientConfig.TorchDeployerLightSource lightSource;
         try {
