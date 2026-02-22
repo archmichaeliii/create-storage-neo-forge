@@ -13,8 +13,8 @@ import net.fxnt.fxntstorage.item.upgrades.UpgradeItem;
 import net.fxnt.fxntstorage.util.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -22,20 +22,13 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.effect.MobEffectCategory;
-import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.food.FoodData;
-import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.ItemContainerContents;
-import net.minecraft.world.item.component.SuspiciousStewEffects;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Block;
@@ -46,7 +39,6 @@ import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.fml.loading.FMLEnvironment;
-import net.neoforged.neoforge.event.EventHooks;
 import net.neoforged.neoforge.items.IItemHandlerModifiable;
 import org.jetbrains.annotations.NotNull;
 
@@ -55,7 +47,6 @@ import java.util.ArrayDeque;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 
@@ -63,18 +54,27 @@ public class BackpackOnBackUpgradeHandler {
 
     private final Player player;
     private final ItemStack itemStack;
+    private final Set<String> cachedUpgrades;
+    private IBackpackContainer cachedContainer;
 
     public BackpackOnBackUpgradeHandler(Player player) {
         this.player = player;
         this.itemStack = BackpackHelper.getEquippedBackpackStack(player);
+        this.cachedUpgrades = loadUpgrades();
     }
 
-    public boolean hasUpgrade(String upgradeName) {
-        if (this.itemStack.isEmpty()) return false;
-        List<String> upgrades = Optional.ofNullable(this.itemStack.getComponents().get(ModDataComponents.BACKPACK_UPGRADES))
-                .orElse(List.of());
+    /**
+     * Loads all upgrade names once during construction. If the BACKPACK_UPGRADES
+     * component is corrupt/empty, falls back to scanning the container items
+     * (expensive) but only does so once per handler instance instead of per-call.
+     */
+    private Set<String> loadUpgrades() {
+        if (this.itemStack.isEmpty()) return Set.of();
 
-        if (upgrades.contains(upgradeName)) return true;
+        List<String> upgrades = this.itemStack.getComponents().get(ModDataComponents.BACKPACK_UPGRADES);
+        if (upgrades != null && !upgrades.isEmpty()) {
+            return new HashSet<>(upgrades);
+        }
 
         // Fallback: check actual upgrade items in CONTAINER component.
         // The BACKPACK_UPGRADES string list can become empty/corrupt under
@@ -83,167 +83,43 @@ public class BackpackOnBackUpgradeHandler {
         List<ItemStack> items = contents.stream().toList();
         int upgradeStart = BackpackBlock.ITEM_SLOT_COUNT + BackpackBlock.TOOL_SLOT_COUNT;
         int upgradeEnd = Math.min(upgradeStart + BackpackBlock.UPGRADE_SLOT_COUNT, items.size());
+
+        Set<String> result = new HashSet<>();
         for (int i = upgradeStart; i < upgradeEnd; i++) {
             if (items.get(i).getItem() instanceof UpgradeItem upgradeItem) {
-                if (upgradeItem.getUpgradeName().equals(upgradeName)) {
-                    // Repair the corrupt BACKPACK_UPGRADES component
-                    repairUpgradeComponent(items, upgradeStart, upgradeEnd);
-                    return true;
-                }
+                result.add(upgradeItem.getUpgradeName());
             }
         }
-        return false;
+
+        // Repair the corrupt BACKPACK_UPGRADES component so future ticks skip the fallback
+        if (!result.isEmpty()) {
+            this.itemStack.set(ModDataComponents.BACKPACK_UPGRADES, new ArrayList<>(result));
+        }
+
+        return result;
     }
 
-    private void repairUpgradeComponent(List<ItemStack> items, int upgradeStart, int upgradeEnd) {
-        List<String> repairedUpgrades = new ArrayList<>();
-        for (int i = upgradeStart; i < upgradeEnd; i++) {
-            if (items.get(i).getItem() instanceof UpgradeItem upgradeItem) {
-                String name = upgradeItem.getUpgradeName();
-                if (!repairedUpgrades.contains(name)) {
-                    repairedUpgrades.add(name);
-                }
-            }
-        }
-        this.itemStack.set(ModDataComponents.BACKPACK_UPGRADES, repairedUpgrades);
+    public boolean hasUpgrade(String upgradeName) {
+        return cachedUpgrades.contains(upgradeName);
     }
 
     private IBackpackContainer getContainer() {
+        if (cachedContainer != null) return cachedContainer;
         if (player.containerMenu instanceof BackpackMenu backPackMenu && backPackMenu.backpackType == Util.BACKPACK_ON_BACK) {
-            return backPackMenu.container;
+            cachedContainer = backPackMenu.container;
         } else {
-            return new BackpackContainer(this.itemStack, this.player);
+            cachedContainer = new BackpackContainer(this.itemStack, this.player);
         }
+        return cachedContainer;
     }
 
     // Magnet and item pickup logic delegated to MagnetUpgradeHandler
+    // Feeder logic delegated to FeederUpgradeHandler
 
     // SERVER SIDE
     public void applyPickBlockUpgrade(ItemStack pickedStack) {
         if (this.itemStack.isEmpty() || this.player.level().isClientSide || !hasUpgrade(Util.PICKBLOCK_UPGRADE)) return;
         PickBlockHandler.pickBlockHandler(player, getContainer(), pickedStack);
-    }
-
-    // SERVER SIDE
-    public void applyFeederUpgrade() {
-        if (this.itemStack.isEmpty() || this.player.level().isClientSide || !hasUpgrade(Util.FEEDER_UPGRADE)) return;
-        boolean doFeed = shouldFeedPlayer();
-
-        if (doFeed) {
-            // Look for food in backpack
-            IBackpackContainer container = getContainer();
-            IItemHandlerModifiable itemHandler = container.getItemHandler();
-
-            for (int i = 0; i < itemHandler.getSlots(); i++) {
-                ItemStack food = itemHandler.getStackInSlot(i);
-                if (!isEdible(food, player) || hasNegativeEffects(food)) continue;
-
-                String foodName = food.getItem().getName(food).getString();
-
-                // Stash MainHandItem and place food item in Main Hand
-                ItemStack mainHandItem = player.getMainHandItem();
-                player.getInventory().items.set(player.getInventory().selected, food);
-
-                ItemStack singleItem = food.copyWithCount(1);
-
-                // Use the food item and check if it was consumed
-                if (singleItem.use(player.level(), player, InteractionHand.MAIN_HAND).getResult() == InteractionResult.CONSUME) {
-                    player.getInventory().items.set(player.getInventory().selected, mainHandItem);
-                    food.shrink(1);
-                    itemHandler.setStackInSlot(i, food);
-
-                    ItemStack remainder = EventHooks.onItemUseFinish(player, singleItem.copy(), 0, singleItem.getItem().finishUsingItem(singleItem, player.level(), player));
-                    if (!remainder.isEmpty()) {
-                        boolean itemPlaced = false;
-                        int firstEmptyStack = -1;
-
-                        for (int j = 0; j < itemHandler.getSlots(); j++) {
-                            ItemStack stack = itemHandler.getStackInSlot(j);
-
-                            if (stack.isEmpty() && firstEmptyStack < 0) {
-                                firstEmptyStack = j;
-                            }
-                            if ((ItemStack.isSameItemSameComponents(stack, remainder) && stack.getCount() < container.getStackMultiplier() * remainder.getMaxStackSize())) {
-                                ItemStack insertResult = itemHandler.insertItem(j, remainder, false);
-                                if (!insertResult.isEmpty()) {
-                                    player.drop(remainder, true);
-                                }
-                                itemPlaced = true;
-                                break;
-                            }
-                        }
-
-                        if (!itemPlaced && firstEmptyStack > -1) {
-                            itemHandler.insertItem(firstEmptyStack, remainder, false);
-                        }
-                    }
-
-                    container.setDataChanged();
-
-                    if (player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG).getBoolean("DisplayFeederMessage")) {
-                        String foodNameFormatted = (Util.isVowel(foodName.charAt(0)) ? "an" : "a") + " §a" + foodName + "§r";
-                        player.displayClientMessage(Component.translatable("item.fxntstorage.backpack_feeder_upgrade.message", foodNameFormatted), true);
-                    }
-
-                } else {
-                    // For some reason, food item was not consumed, revert item
-                    player.getInventory().items.set(player.getInventory().selected, mainHandItem);
-                }
-
-                return;
-            }
-        }
-    }
-
-    private boolean isEdible(@NotNull ItemStack stack, LivingEntity player) {
-        if (!stack.has(DataComponents.FOOD)) {
-            return false;
-        }
-        FoodProperties foodProperties = stack.getItem().getFoodProperties(stack, player);
-        return foodProperties != null && foodProperties.nutrition() > 0;
-    }
-
-    private boolean hasNegativeEffects(@NotNull ItemStack food) {
-        FoodProperties foodProperties = food.getFoodProperties(this.player);
-        if (foodProperties == null) return false;
-
-        if (food.is(Items.CHORUS_FRUIT) && !player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG).getBoolean("AllowChorusFruit"))
-            return true;
-
-        if (food.is(Items.OMINOUS_BOTTLE)) return true;
-
-        SuspiciousStewEffects stewEffects = food.get(DataComponents.SUSPICIOUS_STEW_EFFECTS);
-        if (stewEffects != null) {
-            for (SuspiciousStewEffects.Entry entry : stewEffects.effects()) {
-                return entry.effect().value().getCategory().equals(MobEffectCategory.HARMFUL);
-            }
-        }
-
-        // This should capture most foods with negative effects
-        for (FoodProperties.PossibleEffect effect : foodProperties.effects()) {
-            MobEffectInstance instance = effect.effectSupplier().get();
-            if (instance.getEffect().value().getCategory().equals(MobEffectCategory.HARMFUL))
-                return true;
-        }
-        return false;
-    }
-
-    private boolean shouldFeedPlayer() {
-        if (player.isCreative() || player.isSpectator()) return false;
-
-        FoodData foodData = player.getFoodData();
-        int hunger = foodData.getFoodLevel();
-        float health = player.getHealth();
-        float maxHealth = player.getMaxHealth();
-
-        CompoundTag fxntSettings = player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG);
-
-        // Feed immediately
-        double healthThreshold = (double) fxntSettings.getInt("FeederHealthThreshold") / 100;
-        if (health < maxHealth * healthThreshold && hunger < 20)
-            return true;
-
-        return hunger < fxntSettings.getDouble("FeederHungerLevel");
     }
 
     // SERVER SIDE
@@ -487,9 +363,10 @@ public class BackpackOnBackUpgradeHandler {
         BlockPos belowPos = playerPos.below();
         Level level = player.level();
 
-        int lightLevel = player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG).getInt("TorchDeployerLightLevel");
-        int cooldown = player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG).getInt("TorchDeployerCooldown");
-        String sourceValue = player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG).getString("TorchDeployerLightSource");
+        CompoundTag settings = player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG);
+        int lightLevel = settings.getInt("TorchDeployerLightLevel");
+        int cooldown = settings.getInt("TorchDeployerCooldown");
+        String sourceValue = settings.getString("TorchDeployerLightSource");
 
         ConfigManager.ClientConfig.TorchDeployerLightSource lightSource;
         try {
