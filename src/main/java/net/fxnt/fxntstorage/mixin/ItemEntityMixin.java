@@ -1,7 +1,7 @@
 package net.fxnt.fxntstorage.mixin;
 
 import net.fxnt.fxntstorage.backpack.BackpackItem;
-import net.fxnt.fxntstorage.backpack.upgrade.BackpackOnBackUpgradeHandler;
+import net.fxnt.fxntstorage.backpack.upgrade.MagnetUpgradeHandler;
 import net.fxnt.fxntstorage.backpack.util.BackpackHelper;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
@@ -37,7 +37,7 @@ public abstract class ItemEntityMixin {
         if (player == null || player.isSpectator() || player.level().isClientSide || !player.isAlive() || player.isSleeping() || player.isDeadOrDying())
             return;
         if (!BackpackHelper.isWearingBackpack(player)) return;
-        if (new BackpackOnBackUpgradeHandler(player).applyItemPickupUpgrade(itemEntity, target, pickupDelay)) {
+        if (MagnetUpgradeHandler.onItemPickup(player, itemEntity, target, pickupDelay)) {
             ci.cancel();
         }
     }
