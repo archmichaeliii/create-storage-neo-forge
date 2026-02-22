@@ -14,7 +14,6 @@ import net.fxnt.fxntstorage.util.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -22,20 +21,13 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.effect.MobEffectCategory;
-import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.food.FoodData;
-import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.ItemContainerContents;
-import net.minecraft.world.item.component.SuspiciousStewEffects;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Block;
@@ -46,7 +38,6 @@ import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.fml.loading.FMLEnvironment;
-import net.neoforged.neoforge.event.EventHooks;
 import net.neoforged.neoforge.items.IItemHandlerModifiable;
 import org.jetbrains.annotations.NotNull;
 
@@ -117,133 +108,12 @@ public class BackpackOnBackUpgradeHandler {
     }
 
     // Magnet and item pickup logic delegated to MagnetUpgradeHandler
+    // Feeder logic delegated to FeederUpgradeHandler
 
     // SERVER SIDE
     public void applyPickBlockUpgrade(ItemStack pickedStack) {
         if (this.itemStack.isEmpty() || this.player.level().isClientSide || !hasUpgrade(Util.PICKBLOCK_UPGRADE)) return;
         PickBlockHandler.pickBlockHandler(player, getContainer(), pickedStack);
-    }
-
-    // SERVER SIDE
-    public void applyFeederUpgrade() {
-        if (this.itemStack.isEmpty() || this.player.level().isClientSide || !hasUpgrade(Util.FEEDER_UPGRADE)) return;
-        boolean doFeed = shouldFeedPlayer();
-
-        if (doFeed) {
-            // Look for food in backpack
-            IBackpackContainer container = getContainer();
-            IItemHandlerModifiable itemHandler = container.getItemHandler();
-
-            for (int i = 0; i < itemHandler.getSlots(); i++) {
-                ItemStack food = itemHandler.getStackInSlot(i);
-                if (!isEdible(food, player) || hasNegativeEffects(food)) continue;
-
-                String foodName = food.getItem().getName(food).getString();
-
-                // Stash MainHandItem and place food item in Main Hand
-                ItemStack mainHandItem = player.getMainHandItem();
-                player.getInventory().items.set(player.getInventory().selected, food);
-
-                ItemStack singleItem = food.copyWithCount(1);
-
-                // Use the food item and check if it was consumed
-                if (singleItem.use(player.level(), player, InteractionHand.MAIN_HAND).getResult() == InteractionResult.CONSUME) {
-                    player.getInventory().items.set(player.getInventory().selected, mainHandItem);
-                    food.shrink(1);
-                    itemHandler.setStackInSlot(i, food);
-
-                    ItemStack remainder = EventHooks.onItemUseFinish(player, singleItem.copy(), 0, singleItem.getItem().finishUsingItem(singleItem, player.level(), player));
-                    if (!remainder.isEmpty()) {
-                        boolean itemPlaced = false;
-                        int firstEmptyStack = -1;
-
-                        for (int j = 0; j < itemHandler.getSlots(); j++) {
-                            ItemStack stack = itemHandler.getStackInSlot(j);
-
-                            if (stack.isEmpty() && firstEmptyStack < 0) {
-                                firstEmptyStack = j;
-                            }
-                            if ((ItemStack.isSameItemSameComponents(stack, remainder) && stack.getCount() < container.getStackMultiplier() * remainder.getMaxStackSize())) {
-                                ItemStack insertResult = itemHandler.insertItem(j, remainder, false);
-                                if (!insertResult.isEmpty()) {
-                                    player.drop(remainder, true);
-                                }
-                                itemPlaced = true;
-                                break;
-                            }
-                        }
-
-                        if (!itemPlaced && firstEmptyStack > -1) {
-                            itemHandler.insertItem(firstEmptyStack, remainder, false);
-                        }
-                    }
-
-                    container.setDataChanged();
-
-                    if (player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG).getBoolean("DisplayFeederMessage")) {
-                        String foodNameFormatted = (Util.isVowel(foodName.charAt(0)) ? "an" : "a") + " §a" + foodName + "§r";
-                        player.displayClientMessage(Component.translatable("item.fxntstorage.backpack_feeder_upgrade.message", foodNameFormatted), true);
-                    }
-
-                } else {
-                    // For some reason, food item was not consumed, revert item
-                    player.getInventory().items.set(player.getInventory().selected, mainHandItem);
-                }
-
-                return;
-            }
-        }
-    }
-
-    private boolean isEdible(@NotNull ItemStack stack, LivingEntity player) {
-        if (!stack.has(DataComponents.FOOD)) {
-            return false;
-        }
-        FoodProperties foodProperties = stack.getItem().getFoodProperties(stack, player);
-        return foodProperties != null && foodProperties.nutrition() > 0;
-    }
-
-    private boolean hasNegativeEffects(@NotNull ItemStack food) {
-        FoodProperties foodProperties = food.getFoodProperties(this.player);
-        if (foodProperties == null) return false;
-
-        if (food.is(Items.CHORUS_FRUIT) && !player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG).getBoolean("AllowChorusFruit"))
-            return true;
-
-        if (food.is(Items.OMINOUS_BOTTLE)) return true;
-
-        SuspiciousStewEffects stewEffects = food.get(DataComponents.SUSPICIOUS_STEW_EFFECTS);
-        if (stewEffects != null) {
-            for (SuspiciousStewEffects.Entry entry : stewEffects.effects()) {
-                return entry.effect().value().getCategory().equals(MobEffectCategory.HARMFUL);
-            }
-        }
-
-        // This should capture most foods with negative effects
-        for (FoodProperties.PossibleEffect effect : foodProperties.effects()) {
-            MobEffectInstance instance = effect.effectSupplier().get();
-            if (instance.getEffect().value().getCategory().equals(MobEffectCategory.HARMFUL))
-                return true;
-        }
-        return false;
-    }
-
-    private boolean shouldFeedPlayer() {
-        if (player.isCreative() || player.isSpectator()) return false;
-
-        FoodData foodData = player.getFoodData();
-        int hunger = foodData.getFoodLevel();
-        float health = player.getHealth();
-        float maxHealth = player.getMaxHealth();
-
-        CompoundTag fxntSettings = player.getPersistentData().getCompound(ConfigManager.FXNTSTORAGE_SETTINGS_TAG);
-
-        // Feed immediately
-        double healthThreshold = (double) fxntSettings.getInt("FeederHealthThreshold") / 100;
-        if (health < maxHealth * healthThreshold && hunger < 20)
-            return true;
-
-        return hunger < fxntSettings.getDouble("FeederHungerLevel");
     }
 
     // SERVER SIDE

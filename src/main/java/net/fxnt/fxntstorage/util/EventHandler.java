@@ -5,6 +5,7 @@ import net.fxnt.fxntstorage.FXNTStorage;
 import net.fxnt.fxntstorage.backpack.main.BackpackContainer;
 import net.fxnt.fxntstorage.backpack.main.IBackpackContainer;
 import net.fxnt.fxntstorage.backpack.upgrade.BackpackOnBackUpgradeHandler;
+import net.fxnt.fxntstorage.backpack.upgrade.FeederUpgradeHandler;
 import net.fxnt.fxntstorage.backpack.upgrade.JetpackHandler;
 import net.fxnt.fxntstorage.backpack.upgrade.MagnetUpgradeHandler;
 import net.fxnt.fxntstorage.backpack.upgrade.JetpackManager;
@@ -61,6 +62,7 @@ public class EventHandler {
     private static int mediumTick = 0;
     private static final int slowTicks = 30;
     private static final int mediumTicks = 15;
+
 
     @SubscribeEvent
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
@@ -143,11 +145,13 @@ public class EventHandler {
         /* Magnet Upgrade - manages its own per-player tick interval */
         MagnetUpgradeHandler.tick(player, handler);
 
+        /* Feeder Upgrade - manages its own per-player tick interval */
+        FeederUpgradeHandler.tick(player, handler);
+
         mediumTick++;
         slowTick++;
         if (mediumTick >= mediumTicks) {
             handler.applyRefillUpgrade();
-            handler.applyFeederUpgrade();
             mediumTick = 0;
         }
         if (slowTick >= slowTicks) {
@@ -199,6 +203,7 @@ public class EventHandler {
             JetpackManager.removePlayer(player);
             TorchDeployerManager.removePlayer(player);
             MagnetUpgradeHandler.removePlayer(player);
+            FeederUpgradeHandler.removePlayer(player);
         }
     }
 
