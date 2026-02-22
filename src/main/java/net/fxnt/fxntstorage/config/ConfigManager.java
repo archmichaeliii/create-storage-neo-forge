@@ -124,6 +124,7 @@ public class ConfigManager {
         public static ModConfigSpec.BooleanValue DISPLAY_FEEDER_MESSAGE;
         public static ModConfigSpec.BooleanValue ALLOW_CHORUS_FRUIT;
         public static ModConfigSpec.BooleanValue MAGNET_IGNORE_FAN_PROCESSING;
+        public static ModConfigSpec.BooleanValue MAGNET_FILTER_TO_BACKPACK_CONTENTS;
         public static ModConfigSpec.BooleanValue TOOLSWAP_PREFER_SILK_TOUCH;
         public static ModConfigSpec.ConfigValue<List<? extends String>> TOOLSWAP_PREFERS_SILK_TOUCH_LIST;
         public static ModConfigSpec.IntValue TORCH_DEPLOYER_COOLDOWN;
@@ -182,6 +183,10 @@ public class ConfigManager {
                     .comment("Prevent the Magnet Upgrade from pulling items that are being processed by a Create Encased Fan.")
                     .translation("fxntstorage.configuration.ignoreFanProcessing")
                     .define("ignoreFanProcessing", true);
+            MAGNET_FILTER_TO_BACKPACK_CONTENTS = CLIENT_BUILDER
+                    .comment("When enabled, the Magnet Upgrade only pulls items that match items already in the backpack. Non-matching items go to the player inventory instead.")
+                    .translation("fxntstorage.configuration.magnetFilterToBackpackContents")
+                    .define("magnetFilterToBackpackContents", false);
             CLIENT_BUILDER.pop();
 
             CLIENT_BUILDER.comment("Tool Swap Upgrade").push("tool_swap_upgrade");
@@ -248,6 +253,7 @@ public class ConfigManager {
             settings.put("PrefersSilkTouchList", listTag);
             settings.putBoolean("PreferSilkTouch", TOOLSWAP_PREFER_SILK_TOUCH.get());
             settings.putBoolean("IgnoreFanProcessing", MAGNET_IGNORE_FAN_PROCESSING.get());
+            settings.putBoolean("MagnetFilterToBackpackContents", MAGNET_FILTER_TO_BACKPACK_CONTENTS.get());
             settings.putBoolean("DisplayFeederMessage", DISPLAY_FEEDER_MESSAGE.get());
             settings.putBoolean("AllowChorusFruit", ALLOW_CHORUS_FRUIT.get());
             settings.putInt("TorchDeployerCooldown", TORCH_DEPLOYER_COOLDOWN.get());
