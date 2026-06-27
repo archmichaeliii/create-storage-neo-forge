@@ -378,7 +378,7 @@ public class BackpackOnBackUpgradeHandler {
         }
 
         int blockLightLevel = (lightSource == ConfigManager.ClientConfig.TorchDeployerLightSource.SKY_LIGHT)
-                ? level.getBrightness(LightLayer.BLOCK, playerPos)
+                ? level.getBrightness(LightLayer.SKY, playerPos)
                 : level.getMaxLocalRawBrightness(playerPos);
 
         if (blockLightLevel <= lightLevel &&

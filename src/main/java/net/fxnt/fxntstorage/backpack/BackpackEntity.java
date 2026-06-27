@@ -173,7 +173,10 @@ public class BackpackEntity extends BlockEntity implements IBackpackContainer, M
 
     public List<ItemStack> getStacks() {
         List<ItemStack> stacks = new ArrayList<>();
-        for (int i = 0; i < itemHandler.getSlots(); ++i) {
+        // Exclude the trailing ghost/buffer slot — it is an internal transfer slot and must never
+        // be serialized into the item's CONTAINER component (the item-form container has no ghost
+        // slot, so a serialized ghost item would overflow it on reopen).
+        for (int i = 0; i < itemHandler.getSlots() - 1; ++i) {
             stacks.add(itemHandler.getStackInSlot(i));
         }
         return stacks;
@@ -182,7 +185,8 @@ public class BackpackEntity extends BlockEntity implements IBackpackContainer, M
     public void readInventory(ItemContainerContents contents) {
         List<ItemStack> itemStacks = contents.stream().toList();
 
-        for (int i = 0; i < itemStacks.size(); i++) {
+        int max = Math.min(itemStacks.size(), itemHandler.getSlots() - 1);
+        for (int i = 0; i < max; i++) {
             itemHandler.setStackInSlot(i, itemStacks.get(i));
         }
     }
@@ -244,7 +248,7 @@ public class BackpackEntity extends BlockEntity implements IBackpackContainer, M
         stackMultiplier = (tag.contains("StackMultiplier")) ? tag.getInt("StackMultiplier") : this.stackMultiplier;
         if (tag.contains("CustomName", Tag.TAG_STRING))
             customName = parseCustomNameSafe(tag.getString("CustomName"), registries);
-        sortOrder = (tag.contains("SortOrder", CompoundTag.TAG_STRING)) ? SortOrder.valueOf(tag.getString("SortOrder")) : SortOrder.COUNT;
+        sortOrder = (tag.contains("SortOrder", CompoundTag.TAG_STRING)) ? SortOrder.byName(tag.getString("SortOrder")) : SortOrder.COUNT;
     }
 
     public void refreshUpgrades() {
@@ -281,7 +285,7 @@ public class BackpackEntity extends BlockEntity implements IBackpackContainer, M
         super.handleUpdateTag(tag, lookupProvider);
         itemHandler.deserializeNBT(lookupProvider, tag.getCompound("Items"));
         if (tag.contains("SortOrder", CompoundTag.TAG_STRING))
-            this.sortOrder = SortOrder.valueOf(tag.getString("SortOrder"));
+            this.sortOrder = SortOrder.byName(tag.getString("SortOrder"));
     }
 
     private boolean hasEmptyOrNonMaxSlot(ItemStack pStack) {

@@ -93,9 +93,17 @@ public class PasserEntity extends SmartBlockEntity {
         if (actualInsertAmount > 0) {
             // Do the move!
             if (mode.equals(ItemHelper.ExtractionCountMode.UPTO)) count = actualInsertAmount;
+            // In EXACTLY mode, only move when the destination can accept the full exact amount;
+            // otherwise the real extraction would pull items the destination can't take and they
+            // would be dropped (item loss).
+            if (mode.equals(ItemHelper.ExtractionCountMode.EXACTLY) && actualInsertAmount < count) return;
             extracted = ItemHelper.extract(srcContainer, canAccept, mode, count, false);
-            if (extracted.getCount() == actualInsertAmount)
-                ItemHandlerHelper.insertItemStacked(dstContainer, extracted, false);
+            ItemStack leftover = ItemHandlerHelper.insertItemStacked(dstContainer, extracted, false);
+            // Safety net: if the destination state changed between the simulate and the commit and
+            // some items could not be inserted, return them to the source instead of dropping them.
+            if (!leftover.isEmpty()) {
+                ItemHandlerHelper.insertItemStacked(srcContainer, leftover, false);
+            }
         }
     }
 

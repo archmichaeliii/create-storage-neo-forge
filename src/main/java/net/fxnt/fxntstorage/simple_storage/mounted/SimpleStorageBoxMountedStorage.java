@@ -255,10 +255,12 @@ public class SimpleStorageBoxMountedStorage extends WrapperMountedItemStorage<It
                     } else {
                         existing.grow(reachedLimit ? limit : stack.getCount());
                     }
+                    // A simulated insert must have no side effects: only lock the filter and mark
+                    // dirty when actually committing, otherwise a funnel merely probing the box
+                    // permanently sets its filter without depositing anything.
+                    if (filterItem.isEmpty()) filterItem = stack.copyWithCount(1);
+                    markDirty();
                 }
-                if (filterItem.isEmpty()) filterItem = stack.copyWithCount(1);
-
-                markDirty();
 
                 if (reachedLimit)
                     return (hasVoidUpgrade()) ? ItemStack.EMPTY : stack.copyWithCount(stack.getCount() - limit);

@@ -135,7 +135,9 @@ public class StorageNetwork {
         if (level == null) return new HashSet<>();
 
         List<BlockPos> positions = new ArrayList<>();
+        HashSet<BlockPos> visited = new HashSet<>();
         positions.add(origin);
+        visited.add(origin);
 
         int lastCheckedPos = 0;
         int distanceToController = 0;
@@ -146,7 +148,8 @@ public class StorageNetwork {
                 for (Direction direction : Direction.values()) {
                     BlockPos pos = checkPos.relative(direction);
                     if (isNetworkComponent(level.getBlockState(pos)) && squaredDistance(controllerPos, pos) <= searchRange * searchRange) {
-                        if (!positions.contains(pos)) positions.add(pos);
+                        // O(1) membership via the visited set instead of List.contains (O(n)).
+                        if (visited.add(pos)) positions.add(pos.immutable());
                     }
                 }
                 lastCheckedPos = i;
@@ -185,11 +188,11 @@ public class StorageNetwork {
         ItemStack remaining = itemStack.copy();
 
         while (!remaining.isEmpty()) {
-            SimpleStorageBoxEntity targetBox = StorageNetwork.this.findBestTargetBox(itemStack);
+            SimpleStorageBoxEntity targetBox = StorageNetwork.this.findBestTargetBox(remaining);
             if (targetBox == null) break;
 
             ItemStack beforeInsertion = remaining.copy();
-            remaining = insertIntoBox(targetBox, itemStack, 0, false);
+            remaining = insertIntoBox(targetBox, remaining, 0, false);
 
             if (remaining.getCount() >= beforeInsertion.getCount()) {
                 break;
@@ -219,12 +222,12 @@ public class StorageNetwork {
     }
 
     public boolean canPlaceItem(int slot, ItemStack itemStack) {
-        if (slot > boxes.size()) return false;
+        if (slot < 0 || slot >= boxes.size()) return false;
         return boxes.get(slot).simpleStorageBoxEntity.getItemHandler().insertItem(0, itemStack, true).getCount() < itemStack.getCount();
     }
 
     public boolean canTakeItem(int slot, ItemStack itemStack) {
-        return slot <= boxes.size() && !itemStack.isEmpty();
+        return slot >= 0 && slot < boxes.size() && !itemStack.isEmpty();
     }
 
     private @Nullable SimpleStorageBoxEntity findBestTargetBox(ItemStack itemStack) {
@@ -307,7 +310,7 @@ public class StorageNetwork {
 
         @Override
         public ItemStack getStackInSlot(int slot) {
-            if (slot > boxes.size()) return ItemStack.EMPTY;
+            if (slot < 0 || slot >= boxes.size()) return ItemStack.EMPTY;
             return boxes.get(slot).simpleStorageBoxEntity.getItemHandler().getStackInSlot(0);
         }
 
@@ -331,7 +334,7 @@ public class StorageNetwork {
         @Override
         public ItemStack extractItem(int slot, int amount, boolean simulate) {
             int boxSlot = 0;
-            if (slot > boxes.size()) return ItemStack.EMPTY;
+            if (slot < 0 || slot >= boxes.size()) return ItemStack.EMPTY;
 
             SimpleStorageBoxEntity box = boxes.get(slot).simpleStorageBoxEntity;
             ItemStack current = box.getItemHandler().getStackInSlot(boxSlot);
@@ -354,7 +357,7 @@ public class StorageNetwork {
 
         @Override
         public int getSlotLimit(int slot) {
-            if (slot <= boxes.size())
+            if (slot >= 0 && slot < boxes.size())
                 return boxes.get(slot).simpleStorageBoxEntity.maxItemCapacity;
             return 0;
         }

@@ -118,8 +118,8 @@ public class PickBlockHandler {
                         } else {
                             // Take entire amount from backpack stack
                             amountToMove = Math.min(backpackStack.getCount(), backpackStack.getItem().getMaxStackSize(backpackStack));
-                            // Send backpack stack to hotbar
-                            newInventoryStack = backpackStack.copyWithCount(amountToMove - hotbarStackSize);
+                            // Send backpack stack to hotbar, merged on top of what is already held
+                            newInventoryStack = backpackStack.copyWithCount(amountToMove + hotbarStackSize);
                         }
 
                         player.getInventory().setItem(hotbarSlot, newInventoryStack);

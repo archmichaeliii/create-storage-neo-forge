@@ -96,10 +96,16 @@ public class SimpleStorageBoxEntity extends BlockEntity implements MenuProvider,
             @Override
             public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
                 ItemStack amount = super.insertItem(slot, stack, simulate);
-                if (this.stacks.getFirst().getCount() >= maxItemCapacity && voidUpgrade) {
-                    return ItemStack.EMPTY;
+                if (voidUpgrade) {
+                    // Void overflow only for items the storage slot actually accepts (matches the
+                    // filter / valid slot). Wrong-type items the box rejected must be returned,
+                    // otherwise the void upgrade silently destroys them.
+                    if (slot < VOID_UPGRADE_SLOT && isItemValid(slot, stack)) {
+                        return ItemStack.EMPTY;
+                    }
+                    return amount;
                 }
-                return voidUpgrade || simulate && amount.getCount() < stack.getCount() ? ItemStack.EMPTY : amount;
+                return simulate && amount.getCount() < stack.getCount() ? ItemStack.EMPTY : amount;
             }
 
             @Override

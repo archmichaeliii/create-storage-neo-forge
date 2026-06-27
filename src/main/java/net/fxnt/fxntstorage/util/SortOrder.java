@@ -16,6 +16,19 @@ public enum SortOrder implements StringRepresentable {
     public static final Codec<SortOrder> CODEC = StringRepresentable.fromEnum(SortOrder::values);
     public static final StreamCodec<FriendlyByteBuf, SortOrder> STREAM_CODEC = NeoForgeStreamCodecs.enumCodec(SortOrder.class);
 
+    /**
+     * Safe replacement for {@link #valueOf(String)} that never throws: returns {@link #COUNT} for a
+     * null, empty, or unrecognised name (e.g. contraption/block NBT with no "SortOrder" key yet).
+     */
+    public static SortOrder byName(String name) {
+        if (name != null && !name.isEmpty()) {
+            for (SortOrder order : values()) {
+                if (order.name().equals(name)) return order;
+            }
+        }
+        return COUNT;
+    }
+
     public SortOrder next() {
         return values()[(this.ordinal() + 1) % values().length];
     }

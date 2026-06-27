@@ -26,10 +26,14 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import java.util.*;
 
 public class EMIStonecuttingRecipeHandler extends StonecuttingRecipeHandler {
-    private final Player player = Minecraft.getInstance().player;
 
     @Override
     public List<Slot> getInputSources(StonecutterMenu handler) {
+        // Fetch the player fresh each call: caching it at construction captures null at plugin
+        // load and would never recover (backpack never offered as an ingredient source).
+        Player player = Minecraft.getInstance().player;
+        if (player == null) return new ArrayList<>();
+
         List<Slot> slots = new ArrayList<>(handler.slots.stream().filter(slot -> slot.mayPickup(player)).toList());
 
         ItemStack backpack = BackpackHelper.getEquippedBackpackStack(player);
