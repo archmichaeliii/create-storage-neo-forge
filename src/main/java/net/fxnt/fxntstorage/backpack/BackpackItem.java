@@ -47,7 +47,12 @@ public class BackpackItem extends BlockItem {
         if (stack.getItem() instanceof BackpackItem
                 && entity.getItemBySlot(EquipmentSlot.CHEST).getItem() instanceof BackpackItem) return true; // Allow backpack swap
         if (FXNTStorage.curiosLoaded) {
-            return !BackpackHelper.isWearingBackpack((Player) entity);
+            // canEquip is called for arbitrary LivingEntities (mobs, armor stands), not just
+            // players — guard the cast to avoid a ClassCastException crash.
+            if (entity instanceof Player player) {
+                return !BackpackHelper.isWearingBackpack(player);
+            }
+            return super.canEquip(stack, armorType, entity);
         }
         return super.canEquip(stack, armorType, entity);
     }

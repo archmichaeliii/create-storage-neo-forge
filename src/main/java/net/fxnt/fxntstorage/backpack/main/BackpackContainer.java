@@ -51,7 +51,10 @@ public class BackpackContainer implements IBackpackContainer, IItemHandlerModifi
     public void readInventory(ItemContainerContents contents) {
         List<ItemStack> itemStacks = contents.stream().toList();
 
-        for (int i = 0; i < itemStacks.size(); i++) {
+        // Bound by the handler size so an oversized CONTAINER component (e.g. a legacy stack that
+        // had the backpack ghost slot serialized into it) cannot throw IndexOutOfBounds here.
+        int max = Math.min(itemStacks.size(), itemHandler.getSlots());
+        for (int i = 0; i < max; i++) {
             itemHandler.setStackInSlot(i, itemStacks.get(i));
         }
     }

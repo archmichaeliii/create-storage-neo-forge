@@ -273,14 +273,16 @@ public class StorageBoxEntity extends SmartBlockEntity implements Container, Men
 
     @Override
     public ItemStack removeItem(int pSlot, int pAmount) {
-        itemHandler.extractItem(pSlot, pAmount, false);
-        return itemHandler.getStackInSlot(pSlot);
+        // Must return the items actually removed, not what remains in the slot.
+        return itemHandler.extractItem(pSlot, pAmount, false);
     }
 
     @Override
     public ItemStack removeItemNoUpdate(int pSlot) {
-        itemHandler.insertItem(pSlot, ItemStack.EMPTY, false);
-        return itemHandler.getStackInSlot(pSlot);
+        // Must clear the slot and return its previous contents (Container contract).
+        ItemStack removed = itemHandler.getStackInSlot(pSlot).copy();
+        itemHandler.setStackInSlot(pSlot, ItemStack.EMPTY);
+        return removed;
     }
 
     @Override

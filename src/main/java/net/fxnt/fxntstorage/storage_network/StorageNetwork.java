@@ -185,11 +185,11 @@ public class StorageNetwork {
         ItemStack remaining = itemStack.copy();
 
         while (!remaining.isEmpty()) {
-            SimpleStorageBoxEntity targetBox = StorageNetwork.this.findBestTargetBox(itemStack);
+            SimpleStorageBoxEntity targetBox = StorageNetwork.this.findBestTargetBox(remaining);
             if (targetBox == null) break;
 
             ItemStack beforeInsertion = remaining.copy();
-            remaining = insertIntoBox(targetBox, itemStack, 0, false);
+            remaining = insertIntoBox(targetBox, remaining, 0, false);
 
             if (remaining.getCount() >= beforeInsertion.getCount()) {
                 break;
