@@ -80,7 +80,7 @@ public class StorageControllerEntity extends BlockEntity {
     }
 
     public void transferAllItemsFromPlayer(Player player) {
-        for (int i = 0; i <= player.getInventory().items.size(); i++) {
+        for (int i = 0; i < player.getInventory().items.size(); i++) {
             ItemStack slotStack = player.getInventory().getItem(i);
             if (storageNetwork.isItemInNetwork(slotStack))
                 doTransferItemsFromPlayer(player, slotStack);

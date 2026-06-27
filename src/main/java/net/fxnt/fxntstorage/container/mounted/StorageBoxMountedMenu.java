@@ -103,7 +103,7 @@ public class StorageBoxMountedMenu extends AbstractContainerMenu {
     }
 
     public SortOrder getSortOrder() {
-        return SortOrder.valueOf(nbt.getString("SortOrder"));
+        return SortOrder.byName(nbt.getString("SortOrder"));
     }
 
     public void setSortOrder(SortOrder order) {
@@ -163,6 +163,12 @@ public class StorageBoxMountedMenu extends AbstractContainerMenu {
     }
 
     public void sortStorageItems(int startIndex, int endIndex, SortOrder sortOrder) {
+        // Clamp the client-supplied range to the box's own slots so a crafted packet cannot crash
+        // the server with out-of-range indices or touch player inventory slots.
+        startIndex = Math.max(0, startIndex);
+        endIndex = Math.min(endIndex, this.slotCount);
+        if (endIndex <= startIndex) return;
+
         ServerPlayer sp = (ServerPlayer) player;
 
         // Create a map to track all items (with or without NBT)
@@ -254,7 +260,7 @@ public class StorageBoxMountedMenu extends AbstractContainerMenu {
         ));
         MountedItemStorage storage = contraption.getStorage().getMountedItems().storages.get(localPos);
         if (storage != null && tag != null) {
-            ((StorageBoxMountedStorage) storage).setSortOrder(SortOrder.valueOf(tag.getString("SortOrder")));
+            ((StorageBoxMountedStorage) storage).setSortOrder(SortOrder.byName(tag.getString("SortOrder")));
         }
 //        contraption.resetClientContraption();
     }

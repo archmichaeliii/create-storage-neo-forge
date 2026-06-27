@@ -11,25 +11,25 @@ import java.util.List;
 import java.util.Map;
 
 public class PasserShapeCache {
-    private static final Map<Direction, VoxelShape> shapes = new EnumMap<>(Direction.class);
-
-    static {
-        initializeShapes();
-    }
+    // volatile + atomic swap: getShape() always sees a fully-populated map even if clearCache()
+    // runs on another thread (it is triggered from the client keybind thread, while collision and
+    // shape queries run on the server thread). Mutating a shared map in place exposed a transient
+    // empty/partial map -> null shape -> NPE.
+    private static volatile Map<Direction, VoxelShape> shapes = buildShapes();
 
     public static void clearCache() {
-        shapes.clear();
-        initializeShapes();
+        shapes = buildShapes();
     }
 
-    private static void initializeShapes() {
-        // Initialize and store shapes based on direction
-        shapes.put(Direction.UP, createShapeForDirection(Direction.UP));
-        shapes.put(Direction.DOWN, createShapeForDirection(Direction.DOWN));
-        shapes.put(Direction.NORTH, createShapeForDirection(Direction.NORTH));
-        shapes.put(Direction.SOUTH, createShapeForDirection(Direction.SOUTH));
-        shapes.put(Direction.EAST, createShapeForDirection(Direction.EAST));
-        shapes.put(Direction.WEST, createShapeForDirection(Direction.WEST));
+    private static Map<Direction, VoxelShape> buildShapes() {
+        Map<Direction, VoxelShape> map = new EnumMap<>(Direction.class);
+        map.put(Direction.UP, createShapeForDirection(Direction.UP));
+        map.put(Direction.DOWN, createShapeForDirection(Direction.DOWN));
+        map.put(Direction.NORTH, createShapeForDirection(Direction.NORTH));
+        map.put(Direction.SOUTH, createShapeForDirection(Direction.SOUTH));
+        map.put(Direction.EAST, createShapeForDirection(Direction.EAST));
+        map.put(Direction.WEST, createShapeForDirection(Direction.WEST));
+        return map;
     }
 
     private static VoxelShape createShapeForDirection(Direction direction) {

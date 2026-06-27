@@ -257,7 +257,7 @@ public class StorageBoxMountedStorage extends WrapperMountedItemStorage<ItemStac
 
         filterItem = FilterItemStack.of(context.world.registryAccess(), context.blockEntityData.getCompound("Filter"));
         voidUpgrade = context.blockEntityData.getBoolean("VoidUpgrade");
-        sortOrder = SortOrder.valueOf(context.blockEntityData.getString("SortOrder"));
+        sortOrder = SortOrder.byName(context.blockEntityData.getString("SortOrder"));
 
         this.currentContraption = context.contraption.entity.getContraption();
 

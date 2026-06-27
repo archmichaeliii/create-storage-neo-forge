@@ -121,7 +121,7 @@ public class BackpackContainer implements IBackpackContainer, IItemHandlerModifi
     @Override
     public void setSortOrder(SortOrder sortOrder) {
         this.sortOrder = sortOrder;
-        if (player.level().isClientSide)
+        if (player != null && player.level().isClientSide)
             PacketDistributor.sendToServer(new SetSortOrderPacket(sortOrder));
         setDataChanged();
     }

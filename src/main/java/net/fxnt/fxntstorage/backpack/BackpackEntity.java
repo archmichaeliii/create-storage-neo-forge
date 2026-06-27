@@ -248,7 +248,7 @@ public class BackpackEntity extends BlockEntity implements IBackpackContainer, M
         stackMultiplier = (tag.contains("StackMultiplier")) ? tag.getInt("StackMultiplier") : this.stackMultiplier;
         if (tag.contains("CustomName", Tag.TAG_STRING))
             customName = parseCustomNameSafe(tag.getString("CustomName"), registries);
-        sortOrder = (tag.contains("SortOrder", CompoundTag.TAG_STRING)) ? SortOrder.valueOf(tag.getString("SortOrder")) : SortOrder.COUNT;
+        sortOrder = (tag.contains("SortOrder", CompoundTag.TAG_STRING)) ? SortOrder.byName(tag.getString("SortOrder")) : SortOrder.COUNT;
     }
 
     public void refreshUpgrades() {
@@ -285,7 +285,7 @@ public class BackpackEntity extends BlockEntity implements IBackpackContainer, M
         super.handleUpdateTag(tag, lookupProvider);
         itemHandler.deserializeNBT(lookupProvider, tag.getCompound("Items"));
         if (tag.contains("SortOrder", CompoundTag.TAG_STRING))
-            this.sortOrder = SortOrder.valueOf(tag.getString("SortOrder"));
+            this.sortOrder = SortOrder.byName(tag.getString("SortOrder"));
     }
 
     private boolean hasEmptyOrNonMaxSlot(ItemStack pStack) {

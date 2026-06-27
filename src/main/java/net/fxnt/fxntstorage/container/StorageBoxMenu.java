@@ -146,6 +146,12 @@ public class StorageBoxMenu extends AbstractContainerMenu {
     }
 
     public void sortStorageItems(int startIndex, int endIndex, SortOrder sortOrder) {
+        // Clamp the client-supplied range to the storage box's own slots so a crafted packet
+        // cannot crash the server with out-of-range indices or sort player inventory slots.
+        startIndex = Math.max(0, startIndex);
+        endIndex = Math.min(endIndex, slotCount);
+        if (endIndex <= startIndex) return;
+
         ServerPlayer sp = (ServerPlayer) player;
 
         // Create a map to track all items (with or without NBT)

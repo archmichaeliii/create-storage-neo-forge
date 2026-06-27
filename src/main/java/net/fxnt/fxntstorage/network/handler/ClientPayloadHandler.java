@@ -53,7 +53,8 @@ public class ClientPayloadHandler {
             context.player();
             if (context.player().containerMenu instanceof BackpackMenu && context.player().containerMenu.containerId == packet.containerId()) {
                 IItemHandlerModifiable itemHandler = ((BackpackMenu) context.player().containerMenu).container.getItemHandler();
-                for (int i = 0; i < itemHandler.getSlots(); i++) {
+                int max = Math.min(itemHandler.getSlots(), packet.items().size());
+                for (int i = 0; i < max; i++) {
                     itemHandler.setStackInSlot(i, packet.items().get(i));
                 }
             }
@@ -66,7 +67,8 @@ public class ClientPayloadHandler {
             context.player();
             if (context.player().containerMenu instanceof BackpackMenu && context.player().containerMenu.containerId == packet.containerId()) {
                 IItemHandlerModifiable itemHandler = ((BackpackMenu) context.player().containerMenu).container.getItemHandler();
-                itemHandler.setStackInSlot(packet.slot(), packet.stack());
+                if (packet.slot() >= 0 && packet.slot() < itemHandler.getSlots())
+                    itemHandler.setStackInSlot(packet.slot(), packet.stack());
             }
         });
     }
@@ -89,6 +91,7 @@ public class ClientPayloadHandler {
             Entity entity = level.getEntity(packet.contraptionId());
             if (entity instanceof AbstractContraptionEntity contraptionEntity) {
                 StructureTemplate.StructureBlockInfo blockInfo = contraptionEntity.getContraption().getBlocks().get(packet.localPos());
+                if (blockInfo == null || blockInfo.nbt() == null) return;
                 CompoundTag newNbt = blockInfo.nbt();
                 CompoundTag nbt = packet.nbt();
                 BlockState oldState = blockInfo.state();

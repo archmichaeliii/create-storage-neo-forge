@@ -560,6 +560,13 @@ public class BackpackMenu extends AbstractContainerMenu {
     }
 
     public void sortBackpackItems(int startIndex, int endIndex, SortOrder sortOrder) {
+        // Clamp the client-supplied range to the backpack's own slots. Without this, a crafted
+        // packet could pass out-of-range indices (server crash) or a range overlapping the player
+        // inventory (which the stackMultiplier branch below could then use to inflate stacks).
+        startIndex = Math.max(0, startIndex);
+        endIndex = Math.min(endIndex, Util.UPGRADE_SLOT_END_RANGE);
+        if (endIndex <= startIndex) return;
+
         int stackMultiplier = container.getStackMultiplier();
         ServerPlayer sp = (ServerPlayer) player;
 

@@ -38,6 +38,9 @@ public class StorageInterfaceEntity extends BlockEntity {
 
     public void forgetController() {
         controller = null;
+        // Invalidate so neighbours drop their cached NetworkItemHandler instead of inserting into
+        // a network this interface is no longer part of.
+        if (level != null) level.invalidateCapabilities(this.getBlockPos());
     }
 
     public void serverTick(Level level) {

@@ -319,7 +319,15 @@ public class ServerPayloadHandler {
                 }
 
                 if (collected.isEmpty() || collected.getCount() < maxCraftable) {
-                    return; // missing item(s)
+                    // Not enough of this ingredient. Return any partially-collected items to the
+                    // player and stop placing, then fall through to the persistence/sync below so
+                    // the backpack's in-memory removals are committed. Returning here instead would
+                    // leave removed backpack items both in the grid and (unsaved) in the backpack,
+                    // duplicating them.
+                    if (!collected.isEmpty() && !playerInv.add(collected)) {
+                        player.drop(collected, false);
+                    }
+                    break; // missing item(s)
                 }
 
                 inputSlots.get(slotPosition).setByPlayer(collected);

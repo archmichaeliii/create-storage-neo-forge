@@ -86,9 +86,12 @@ public class StorageBoxEntity extends SmartBlockEntity implements Container, Men
 
             @Override
             public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
-                // Void mode check - might be a slight delay between this check and percentageUsed being updated
                 ItemStack amount = super.insertItem(slot, stack, simulate);
-                if (percentageUsed == 100 && voidUpgrade) {
+                // Void overflow only when the box is genuinely full (computed live, not from the
+                // throttled percentageUsed field which lags up to a second and can void into free
+                // space) and only for items this box actually accepts — never destroy wrong-type
+                // items the filter rejected.
+                if (voidUpgrade && isItemValid(slot, stack) && calculatePercentageUsed() >= 100f) {
                     return ItemStack.EMPTY;
                 }
                 return amount;
@@ -96,8 +99,8 @@ public class StorageBoxEntity extends SmartBlockEntity implements Container, Men
 
             @Override
             public ItemStack extractItem(int slot, int amount, boolean simulate) {
-                ItemStack stackToExtract = getStackInSlot(slot);
-                if (!filterTest(stackToExtract)) return ItemStack.EMPTY;
+                // Extraction must never be gated by the insertion filter, otherwise items already
+                // stored become permanently stuck if the box's filter is later changed.
                 return super.extractItem(slot, amount, simulate);
             }
         };
@@ -216,7 +219,7 @@ public class StorageBoxEntity extends SmartBlockEntity implements Container, Men
         voidUpgrade = tag.getBoolean("VoidUpgrade");
         if (tag.contains("CustomName", CompoundTag.TAG_STRING))
             customName = parseCustomNameSafe(tag.getString("CustomName"), registries);
-        sortOrder = (tag.contains("SortOrder", CompoundTag.TAG_STRING)) ? SortOrder.valueOf(tag.getString("SortOrder")) : SortOrder.COUNT;
+        sortOrder = (tag.contains("SortOrder", CompoundTag.TAG_STRING)) ? SortOrder.byName(tag.getString("SortOrder")) : SortOrder.COUNT;
 
         if (slotCount == 0) {
             FXNTStorage.LOGGER.debug("Migrating slot layout from previous version of Storage Box @ {}", worldPosition);
@@ -365,7 +368,7 @@ public class StorageBoxEntity extends SmartBlockEntity implements Container, Men
         super.handleUpdateTag(tag, registries);
         itemHandler.deserializeNBT(registries, tag.getCompound("Items"));
         if (tag.contains("SortOrder", Tag.TAG_STRING)) {
-            this.sortOrder = SortOrder.valueOf(tag.getString("SortOrder"));
+            this.sortOrder = SortOrder.byName(tag.getString("SortOrder"));
         }
     }
 
